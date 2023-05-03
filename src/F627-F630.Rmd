@@ -1,0 +1,501 @@
+---
+title: "F627-F630 comparison"
+author: "Jon Ahlinder"
+date: "2023-02-27"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+setwd("/Users/joah/OneDrive - Skogforsk/Documents/Projekt/Treeplan/BetulaS23/F627-F630/")
+require(dplyr)
+require(ggplot2)
+library(asreml)
+require(asremlPlus)
+library(rcompanion) # For normal score transformation
+library(lmerTest)
+library(tidyverse)
+library(ggpubr)
+library(knitr)
+```
+
+## Read data
+Data from dataplan
+```{r}
+DMS_F627 <- read.csv(file = "DMS_stems_F627.txt",header = T,sep = ",")
+DMS_F628 <- read.csv(file = "DMS_stems_F628.txt",header = T,sep = ",")
+DMS_F629 <- read.csv(file = "DMS_stems_F629.txt",header = T,sep = ",")
+DMS_F630 <- read.csv(file = "DMS_stems_F630.txt",header = T,sep = ",")
+# Add family origin
+DMS_F627$Origin <- ifelse(grepl("F01FP",DMS_F627$Mum_name),'Finland','Sweden')
+DMS_F628$Origin <- ifelse(grepl("F01FP",DMS_F628$Mum_name),'Finland','Sweden')
+DMS_F629$Origin <- ifelse(grepl("F01FP",DMS_F629$Mum_name),'Finland','Sweden')
+DMS_F630$Origin <- ifelse(grepl("F01FP",DMS_F630$Mum_name),'Finland','Sweden')
+DMS_F627 %>% group_by(Origin) %>% summarize(
+                                      count = n(),
+                                       mean = mean(Hjd_20, na.rm = TRUE), 
+                                         sd = sd(Hjd_20, na.rm = TRUE)) 
+# Remove uninformative columns
+DMS_F627 <- DMS_F627 %>%
+  select(-c(East,North,Grid,Colb,Rowb,contains("_n"),contains("Surface_sum"),contains("Design_sum"),contains("Local_trend"),contains("Bv_exclude"),contains("Skad"))) %>%
+  mutate(Trial = "F627")
+DMS_F628 <- DMS_F628 %>%
+  select(-c(East,North,Grid,Colb,Rowb,contains("_n"),contains("Surface_sum"),contains("Design_sum"),contains("Local_trend"),contains("Bv_exclude"),contains("Skad"))) %>%
+  mutate(Trial = "F628")
+DMS_F629 <- DMS_F629 %>%
+  select(-c(East,North,Grid,Colb,Rowb,contains("_n"),contains("Surface_sum"),contains("Design_sum"),contains("Local_trend"),contains("Bv_exclude"),contains("Skad"))) %>%
+  mutate(Trial = "F629")
+DMS_F630 <- DMS_F630 %>%
+  select(-c(East,North,Grid,Colb,Rowb,contains("_n"),contains("Surface_sum"),contains("Design_sum"),contains("Local_trend"),contains("Bv_exclude"),contains("Skad"))) %>%
+  mutate(Trial = "F630")
+```
+
+## Merge data
+
+```{r}
+common_cols1 <- intersect(colnames(DMS_F627), colnames(DMS_F628))
+common_cols2 <- intersect(common_cols1, colnames(DMS_F629))
+common_cols <- intersect(common_cols2, colnames(DMS_F630))
+print(common_cols)
+DMS_F627_c <- DMS_F627 %>% 
+  select(all_of(common_cols))
+DMS_F628_c <- DMS_F628 %>% 
+  select(all_of(common_cols))
+DMS_F629_c <- DMS_F629 %>% 
+  select(all_of(common_cols))
+DMS_F630_c <- DMS_F630 %>% 
+  select(all_of(common_cols))
+DMS_trials <- rbind(DMS_F627_c,DMS_F628_c,DMS_F629_c,DMS_F630_c)
+rm(DMS_F627_c,DMS_F628_c,DMS_F629_c,DMS_F630_c)
+DMS_trials$Sortnr <- as.factor(DMS_trials$Sortnr)
+DMS_F627 %>% group_by(Origin) %>% summarize(
+                                      count = n(),
+                                       mean = mean(Hjd_20, na.rm = TRUE), 
+                                         sd = sd(Hjd_20, na.rm = TRUE))
+DMS_F628 %>% group_by(Origin) %>% summarize(
+                                      count = n(),
+                                       mean = mean(Hjd_20, na.rm = TRUE), 
+                                         sd = sd(Hjd_20, na.rm = TRUE))
+DMS_F629 %>% group_by(Origin) %>% summarize(
+                                      count = n(),
+                                       mean = mean(Hjd_20, na.rm = TRUE), 
+                                         sd = sd(Hjd_20, na.rm = TRUE))
+DMS_F630 %>% group_by(Origin) %>% summarize(
+                                      count = n(),
+                                       mean = mean(Hjd_20, na.rm = TRUE), 
+                                         sd = sd(Hjd_20, na.rm = TRUE))
+
+```
+
+
+## Plot phenotypic records
+
+```{r}
+DMS_trials <- DMS_trials %>% 
+  select(-c(Stem_id,Genotype_id,Mum_id,Mum_type,Dad_id,Dad_type,Family_id,Ploc))
+write.table(x = DMS_trials, file = "Data_F627_628_629_630.txt",sep="\t",quote = FALSE,row.names = FALSE) 
+p3 <- DMS_trials %>% group_by(Origin,Sortnr,Trial) %>% summarize(
+                                      count = n(),
+                                       Mean = mean(Hjd_20, na.rm = TRUE), 
+                                         Sd = sd(Hjd_20, na.rm = TRUE)) %>%
+  ggplot(aes(x = Sortnr,y = Mean,fill = Origin)) + 
+  geom_bar(stat="identity", color="black") + 
+  scale_fill_manual(values=c("#56B4E9","#E69F00")) + 
+  facet_wrap(~Trial,scales = "free") +
+  theme(axis.text.x = element_blank()) +
+  geom_errorbar(aes(ymin=Mean-Sd, max=Mean+Sd), width=.2, position=position_dodge(width=0.7)); p3
+p4 <- DMS_trials %>% group_by(Origin,Sortnr,Trial) %>% summarize(
+                                      count = n(),
+                                       Mean = mean(Dia_20, na.rm = TRUE), 
+                                         Sd = sd(Dia_20, na.rm = TRUE)) %>%
+  ggplot(aes(x = Sortnr,y = Mean,fill = Origin)) + 
+  geom_bar(stat="identity", color="black") + 
+  scale_fill_manual(values=c("#56B4E9","#E69F00")) + 
+  facet_wrap(~Trial,scales = "free") +
+  theme(axis.text.x = element_blank()) +
+  geom_errorbar(aes(ymin=Mean-Sd, max=Mean+Sd), width=.2, position=position_dodge(width=0.7)); p4  
+
+
+```
+
+## Transform traits
+Calculate volume, production, and normal score transform Gkva and Klyk. Check Vitality too! Some traits should perhaps be log-transformed.
+```{r}
+# Transform height and diameter to meter unit
+DMS_trials <- DMS_trials %>% 
+  mutate(Hjd_20 = Hjd_20*0.1) %>% # dm to m
+  mutate(Dia_20 = Dia_20*0.1) # mm to cm
+# per hectare volume production (5 x 5 parcel of size 10 x 10 meter which is 100 square meters), volume functions gives volume in cubic dm which is a factor 100 less if converted to cubic meters
+DMS_trials2 <- DMS_trials %>%  mutate(Vol_20_1 = (10^-0.84627 * Dia_20^2.23818 * (Dia_20 + 20)^-1.06930 * Hjd_20^6.02015 * (Hjd_20 - 1.3)^-4.51472)) %>% 
+  mutate(Vol_20_2 = exp(2.10253*log(Dia_20+0.0001) + 3.98519*log(Hjd_20+0.00001) - 2.65900*log(Hjd_20 - 1.3) - 0.0140970*Dia_20 - 4.49213)) %>% 
+  mutate(Vol_20 = Vol_20_1) %>%  
+  mutate(GkvaNScore_20 = blom(Gkva_20)) %>% # 20 year measurement
+  mutate(KlykNScore_20 = blom(Klyk_20)) %>% # 20 year measurement
+  mutate(GkvaNScore_10 = blom(Gkva_10)) %>% # 10 year measurement
+  mutate(KlykNScore_10 = blom(Klyk_10)) %>% # 10 year measurement
+  mutate(VitNScore_20 = blom(Vit_20)) # 20 year measurement
+# Brandel, G. 1990. Volymfunktioner för enskilda träd. Tall, gran och björk. SLU, Inst f skogsproduktion, Rapport 26, 72 s., Garpenberg. Sammanfattning i Fakta Skog nr 11, 1994.
+  cor.test(DMS_trials2$Vol_20_1,DMS_trials2$Vol_20_2) # both measures almost identical
+p1 <- ggplot(data = DMS_trials2, aes(x = GkvaNScore_20)) + 
+  geom_histogram(color="black", fill="green") +
+  ggtitle(label = "Normal score transformed branch quality at age 20"); p1
+p2 <- ggplot(data = DMS_trials2, aes(x = GkvaNScore_10)) + 
+  geom_histogram(color="black", fill="green") +
+  ggtitle(label = "Normal score transformed branch quality at age 10"); p2
+p3 <- ggplot(data = DMS_trials2, aes(x = KlykNScore_20)) + 
+  geom_histogram(color="black", fill="yellow") +
+  ggtitle(label = "Normal score transformed forking at age 20"); p3
+p4 <- ggplot(data = DMS_trials2, aes(x = KlykNScore_10)) + 
+  geom_histogram(color="black", fill="yellow") +
+  ggtitle(label = "Normal score transformed forking at age 10"); p4
+p5 <- ggplot(data = DMS_trials2, aes(x = VitNScore_20)) + 
+  geom_histogram(color="black", fill="blue") +
+  ggtitle(label = "Normal score transformed Vitality at age 20"); p5
+p6 <- ggplot(data = DMS_trials2, aes(x = Vol_20)) + 
+  geom_histogram(color="black", fill="red") +
+  ggtitle(label = "Volume production per hectare at age 20"); p6
+p7 <- ggplot(data = DMS_trials2, aes(x = log(Vol_20))) + 
+  geom_histogram(color="black", fill="red") +
+  ggtitle(label = "Logarithm of volume production per hectare at age 20"); p7
+
+
+```
+
+## LMM analysis single trial
+
+```{r}
+############## us i.e. unstructured residual ##############
+#DMS_F627 <- DMS_trials %>% 
+#  filter(Trial == "F627") %>%
+#  mutate(across(c(Trial,Sortnr,Ruta,Rad,Planta),factor))
+# First single trait
+# Volume at year 20
+#lp.asr.u <- asreml(
+#  fixed = Vol_20 ~ 1,
+#  random = ~ idv(Sortnr) + idv(Ruta) + idv(Ruta):Rad + idv(Ruta):Planta,
+#  data = DMS_F627,
+#  residual = ~id(units),
+#  ai.sing=TRUE,
+#  maxit = 200
+#)
+# Multiple trait
+#lp.asr.u <- asreml(
+#  fixed = cbind(Vol_20,GkvaNScore_10,KlykNScore_20,VitNScore_20) ~ trait,
+#  random = ~ us(trait):Sortnr + us(trait):Ruta + us(trait):Ruta:Rad + us(trait):Ruta:Planta,
+#  residual = ~ id(units):us(trait),
+#  data = DMS_F627,
+#  na.action = na.method(x = "include", y = "include"),
+#  start.values = FALSE,
+#  maxit = 200
+#)
+```
+
+## LMM analysis multiple trials
+Using ASReml-R, multiple-trial analysis, multi-trait. As predictors, I include the fixed effect of environment i, the random effect of family (i.e. sortnr) j, the random interaction between genotype j and environment i,
+and the random effect of block k nested in environment i 
+```{r}
+# First add an interaction term between Sortnr and trial
+#DMS_trials %>%
+#  mutate(GxE = Sortnr * Trial)
+DMS_trials2 <- DMS_trials2 %>%
+mutate(across(c(Trial,Sortnr,Ruta,Rad,Planta),factor))
+############## us i.e. unstructured residual ##############
+# Fit the model
+model <- asreml(fixed = cbind(Vol_20,GkvaNScore_10,KlykNScore_20,VitNScore_20) ~ trait + at(trait):Trial,
+          random = ~ us(trait):Sortnr: + us(trait):Sortnr:Trial + us(trait):Trial:Ruta,
+          residual = ~ id(units):us(trait),
+          na.action = na.method(x = "include", y = "include"),
+          data = DMS_trials2,
+          maxit = 1000)
+test <- wald.asreml(model, denDF = "default", ssType = "conditional")$Wald; test
+summary(model, coef = TRUE)$coef.fi
+summary(model)$varcomp
+
+vpredict(model, r_A ~ V8 / sqrt(V7 * V9))
+#lp.asr.u <- asreml(
+#  fixed = cbind(Vol_20,GkvaNScore_10,KlykNScore_20,VitNScore_20) ~ trait + Trial,
+#  random = ~ us(trait, init = rep(0,6)):Sortnr +
+#    us(trait, init = rep(0,6)):at(Sortnr):us(trait, init = rep(0,6)):at(Trial),
+#  residual = ~ id(units):us(trait), # , init = rep(0,6)
+#  data = DMS_trials,
+#  na.action = na.method(x = "include", y = "include"),
+#  start.values = TRUE,
+#  maxit = 200
+#)
+```
+
+## Fixed effect ANOVA analysis
+Volume at year 20
+```{r}
+# Remove Fältnr not present in three out of four trials
+DMS_subset <- DMS_trials2 %>% 
+  filter(Sortnr == 1 | Sortnr == 2 | Sortnr == 5 | Sortnr == 8 | Sortnr == 9 | Sortnr == 12) %>% # Sortnr 13 removed  | Sortnr == 13
+  mutate(across(c(Trial,Sortnr,Ruta,Rad,Planta),factor))
+# Recode Fältnr according to origin
+DMS_subset$Sortnr <- recode_factor(DMS_subset$Sortnr, "1" = "Pltg Sv373","2" = "Pltg Sv379", "5" = "Pltg Sv390","8" = "Frötäkt1089", "9" = "F250Sävar", "12" = "Plus 62-64") # , "13" = "Plus 64-66"
+## Plot of per hectare volume production per sortnr
+p8 <- DMS_subset %>% group_by(Origin,Sortnr,Trial) %>% summarize(
+                                      count = n(),
+                                       Mean = mean(Vol_20, na.rm = TRUE), 
+                                         Sd = sd(Vol_20, na.rm = TRUE)) %>%
+  ggplot(aes(x = Sortnr,y = Mean,fill = Origin)) + 
+  geom_bar(stat="identity", color="black") + 
+  scale_fill_manual(values=c("#56B4E9","#E69F00")) + 
+  facet_wrap(~Trial,scales = "free") +
+  theme(axis.text.x = element_text(angle = 90,size = 6),axis.title.x = element_blank()) +
+  ylab("Volume production per hectare") +
+  geom_errorbar(aes(ymin=Mean-Sd, max=Mean+Sd), width=.2, position=position_dodge(width=0.7)); p8 
+ggsave(filename = "Figures/barplot_across_trial_volume_production.png",plot = p8,dpi = "print")
+p6 <- ggboxplot(DMS_subset, x = "Sortnr", y = "Vol_20") +
+  facet_wrap(~Trial,scales = "free") +
+  theme(axis.title.x = element_blank(),axis.text.x = element_text(angle = 90,size = 6), axis.text.y = element_text(size = 8)); p6 # Visualize Sortnr differences in Volume at year 20
+p7 <- ggboxplot(
+  DMS_subset, x = "Sortnr", y = "Vol_20",
+  color = "Trial", palette = "jco"
+  ); p7
+
+# Linear model with only fixed effects
+lm1 <- lm(Vol_20 ~ Trial + Sortnr + Trial:Sortnr + Trial:Ruta, data = DMS_subset)
+summary(lm1) # Too many classes
+hist(resid(lm1),nclass = 30) # should be normally distributed
+#create Q-Q plot for residuals
+qqnorm(resid(lm1))
+
+#add a straight diagonal line to the plot
+qqline(resid(lm1)) 
+# ANOVA
+an2 <- aov(lm1)
+summary(an2)
+
+# Save the output to a text file
+output <- capture.output(summary(an2))
+writeLines(output, "output_anova_production_20.txt")
+write.table(output, "output_anova_production_20.txt", sep = "\t",quote=FALSE,row.names = FALSE)
+par(mfrow=c(2,2))
+plot(an2)
+par(mfrow=c(1,1))
+tukey.two.way<-TukeyHSD(an2) # To find out which groups are statistically different from one another, you can perform a Tukey’s Honestly Significant Difference (Tukey’s HSD) post-hoc test for pairwise comparisons
+#plot(tukey.two.way, las = 2)
+
+# plot trial effect comparison
+CIlow <-tukey.two.way$Trial[,'lwr']
+CIhigh <- tukey.two.way$Trial[,'upr']
+  pt <- tukey.two.way$Trial %>%
+    as.data.frame(.) %>%
+    rownames_to_column(.)  %>%
+    rename(Estimate = diff,Comparison = rowname) %>%
+  ggplot(aes(x=Comparison,y=Estimate)) +  
+  geom_point(size = 0.1) +
+  geom_pointrange(aes(ymin = CIlow,ymax = CIhigh)) +
+  coord_flip() +
+  theme_bw() +
+  xlab("Comparison") +
+  ylab("Estimate") +
+  geom_hline(yintercept=0,lty = 2) + 
+  scale_y_continuous(expand = c(0,0)); pt
+# Plot Sortnr comparison
+CIlow <-tukey.two.way$Sortnr[,'lwr']
+CIhigh <- tukey.two.way$Sortnr[,'upr']
+  ps <- tukey.two.way$Sortnr %>%
+    as.data.frame(.) %>%
+    rownames_to_column(.)  %>%
+    rename(Estimate = diff,Comparison = rowname) %>%
+  ggplot(aes(x=Comparison,y=Estimate)) +  
+  geom_point(size = 0.1) +
+  geom_pointrange(aes(ymin = CIlow,ymax = CIhigh)) +
+  coord_flip() +
+  theme_bw() +
+  xlab("Comparison") +
+  ylab("Estimate") +
+  geom_hline(yintercept=0,lty = 2) + 
+  scale_y_continuous(expand = c(0,0)); ps
+```
+
+Vitality at year 20 (normal score transformed)
+
+```{r}
+p8 <- ggboxplot(DMS_subset, x = "Sortnr", y = "VitNScore_20") +
+  facet_wrap(~Trial,scales = "free") +
+  theme(axis.title.x = element_blank(),axis.text.x = element_text(angle = 90,size = 6), axis.text.y = element_text(size = 8)); p8 # Visualize Sortnr differences in Volume at year 20
+p9 <- ggboxplot(
+  DMS_subset, x = "Sortnr", y = "VitNScore_20",
+  color = "Trial", palette = "jco"
+  ); p9
+
+# Linear model with only fixed effects
+lm1 <- lm(VitNScore_20 ~ Trial + Sortnr + Trial * Sortnr + Ruta * Trial + Rad * Trial + Planta * Trial, data = DMS_subset)
+#summary(lm1) # Too many classes 
+hist(resid(lm1),nclass = 30) # should be normally distributed
+#create Q-Q plot for residuals
+qqnorm(resid(lm1))
+
+#add a straight diagonal line to the plot
+qqline(resid(lm1)) 
+# ANOVA
+an2 <- aov(lm1)
+par(mfrow=c(2,2))
+plot(an2)
+par(mfrow=c(1,1))
+tukey.two.way<-TukeyHSD(an2) # To find out which groups are statistically different from one another, you can perform a Tukey’s Honestly Significant Difference (Tukey’s HSD) post-hoc test for pairwise comparisons
+#plot(tukey.two.way, las = 2)
+
+# plot trial effect comparison
+CIlow <-tukey.two.way$Trial[,'lwr']
+CIhigh <- tukey.two.way$Trial[,'upr']
+  pt2 <- tukey.two.way$Trial %>%
+    as.data.frame(.) %>%
+    rownames_to_column(.)  %>%
+    rename(Estimate = diff,Comparison = rowname) %>%
+  ggplot(aes(x=Comparison,y=Estimate)) +  
+  geom_point(size = 0.1) +
+  geom_pointrange(aes(ymin = CIlow,ymax = CIhigh)) +
+  coord_flip() +
+  theme_bw() +
+  xlab("Comparison") +
+  ylab("Estimate") +
+  geom_hline(yintercept=0,lty = 2) + 
+  scale_y_continuous(expand = c(0,0)); pt2
+# Plot Sortnr comparison
+CIlow <-tukey.two.way$Sortnr[,'lwr']
+CIhigh <- tukey.two.way$Sortnr[,'upr']
+  ps2 <- tukey.two.way$Sortnr %>%
+    as.data.frame(.) %>%
+    rownames_to_column(.)  %>%
+    rename(Estimate = diff,Comparison = rowname) %>%
+  ggplot(aes(x=Comparison,y=Estimate)) +  
+  geom_point(size = 0.1) +
+  geom_pointrange(aes(ymin = CIlow,ymax = CIhigh)) +
+  coord_flip() +
+  theme_bw() +
+  xlab("Comparison") +
+  ylab("Estimate") +
+  geom_hline(yintercept=0,lty = 2) + 
+  scale_y_continuous(expand = c(0,0)); ps2
+```
+
+Analyzing trait branch quality at age 10
+
+```{r}
+p10 <- ggboxplot(DMS_subset, x = "Sortnr", y = "GkvaNScore_10") +
+  facet_wrap(~Trial,scales = "free") +
+  theme(axis.title.x = element_blank(),axis.text.x = element_text(angle = 90,size = 6), axis.text.y = element_text(size = 8)); p10 # Visualize Sortnr differences in Volume at year 20
+p11 <- ggboxplot(
+  DMS_subset, x = "Sortnr", y = "GkvaNScore_10",
+  color = "Trial", palette = "jco"
+  ); p11
+
+# Linear model with only fixed effects
+lm1 <- lm(GkvaNScore_10 ~ Trial + Sortnr + Trial * Sortnr + Ruta * Trial + Rad * Trial + Planta * Trial, data = DMS_subset)
+#summary(lm1) # Too many classes 
+hist(resid(lm1),nclass = 30) # should be normally distributed
+#create Q-Q plot for residuals
+qqnorm(resid(lm1))
+
+#add a straight diagonal line to the plot
+qqline(resid(lm1)) 
+# ANOVA
+an2 <- aov(lm1)
+par(mfrow=c(2,2))
+plot(an2)
+par(mfrow=c(1,1))
+tukey.two.way<-TukeyHSD(an2) # To find out which groups are statistically different from one another, you can perform a Tukey’s Honestly Significant Difference (Tukey’s HSD) post-hoc test for pairwise comparisons
+#plot(tukey.two.way, las = 2)
+
+# plot trial effect comparison
+CIlow <-tukey.two.way$Trial[,'lwr']
+CIhigh <- tukey.two.way$Trial[,'upr']
+  pt3 <- tukey.two.way$Trial %>%
+    as.data.frame(.) %>%
+    rownames_to_column(.)  %>%
+    rename(Estimate = diff,Comparison = rowname) %>%
+  ggplot(aes(x=Comparison,y=Estimate)) +  
+  geom_point(size = 0.1) +
+  geom_pointrange(aes(ymin = CIlow,ymax = CIhigh)) +
+  coord_flip() +
+  theme_bw() +
+  xlab("Comparison") +
+  ylab("Estimate") +
+  geom_hline(yintercept=0,lty = 2) + 
+  scale_y_continuous(expand = c(0,0)); pt3
+# Plot Sortnr comparison
+CIlow <-tukey.two.way$Sortnr[,'lwr']
+CIhigh <- tukey.two.way$Sortnr[,'upr']
+  ps3 <- tukey.two.way$Sortnr %>%
+    as.data.frame(.) %>%
+    rownames_to_column(.)  %>%
+    rename(Estimate = diff,Comparison = rowname) %>%
+  ggplot(aes(x=Comparison,y=Estimate)) +  
+  geom_point(size = 0.1) +
+  geom_pointrange(aes(ymin = CIlow,ymax = CIhigh)) +
+  coord_flip() +
+  theme_bw() +
+  xlab("Comparison") +
+  ylab("Estimate") +
+  geom_hline(yintercept=0,lty = 2) + 
+  scale_y_continuous(expand = c(0,0)); ps3
+```
+
+Analyzing trait Forking at age 20
+
+```{r}
+p12 <- ggboxplot(DMS_subset, x = "Sortnr", y = "KlykNScore_20") +
+  facet_wrap(~Trial,scales = "free") +
+  theme(axis.title.x = element_blank(),axis.text.x = element_text(angle = 90,size = 6), axis.text.y = element_text(size = 8)); p12 # Visualize Sortnr differences in Volume at year 20
+p13 <- ggboxplot(
+  DMS_subset, x = "Sortnr", y = "KlykNScore_20",
+  color = "Trial", palette = "jco"
+  ); p13
+
+# Linear model with only fixed effects
+lm1 <- lm(KlykNScore_20 ~ Trial + Sortnr + Trial * Sortnr + Ruta * Trial + Rad * Trial + Planta * Trial, data = DMS_subset)
+#summary(lm1) # Too many classes 
+hist(resid(lm1),nclass = 30) # should be normally distributed
+#create Q-Q plot for residuals
+qqnorm(resid(lm1))
+
+#add a straight diagonal line to the plot
+qqline(resid(lm1)) 
+# ANOVA
+an2 <- aov(lm1)
+par(mfrow=c(2,2))
+plot(an2)
+par(mfrow=c(1,1))
+tukey.two.way<-TukeyHSD(an2) # To find out which groups are statistically different from one another, you can perform a Tukey’s Honestly Significant Difference (Tukey’s HSD) post-hoc test for pairwise comparisons
+#plot(tukey.two.way, las = 2)
+
+# plot trial effect comparison
+CIlow <-tukey.two.way$Trial[,'lwr']
+CIhigh <- tukey.two.way$Trial[,'upr']
+  pt4 <- tukey.two.way$Trial %>%
+    as.data.frame(.) %>%
+    rownames_to_column(.)  %>%
+    rename(Estimate = diff,Comparison = rowname) %>%
+  ggplot(aes(x=Comparison,y=Estimate)) +  
+  geom_point(size = 0.1) +
+  geom_pointrange(aes(ymin = CIlow,ymax = CIhigh)) +
+  coord_flip() +
+  theme_bw() +
+  xlab("Comparison") +
+  ylab("Estimate") +
+  geom_hline(yintercept=0,lty = 2) + 
+  scale_y_continuous(expand = c(0,0)); pt4
+# Plot Sortnr comparison
+CIlow <-tukey.two.way$Sortnr[,'lwr']
+CIhigh <- tukey.two.way$Sortnr[,'upr']
+  ps4 <- tukey.two.way$Sortnr %>%
+    as.data.frame(.) %>%
+    rownames_to_column(.)  %>%
+    rename(Estimate = diff,Comparison = rowname) %>%
+  ggplot(aes(x=Comparison,y=Estimate)) +  
+  geom_point(size = 0.1) +
+  geom_pointrange(aes(ymin = CIlow,ymax = CIhigh)) +
+  coord_flip() +
+  theme_bw() +
+  xlab("Comparison") +
+  ylab("Estimate") +
+  geom_hline(yintercept=0,lty = 2) + 
+  scale_y_continuous(expand = c(0,0)); ps4
+```
+
+
+
